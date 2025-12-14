@@ -7,46 +7,225 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==================== ESCRITÓRIO E USUÁRIOS ====================
+
+model Escritorio {
+  id          String   @id @default(cuid())
+  nome        String
+  cnpj        String?
+  endereco    String?
+  telefone    String?
+  email       String?
+  logo        String?  // URL do logo
+
+  // Plano/Assinatura
+  plano       String   @default("free") // free, pro, enterprise
+  limiteUsuarios Int   @default(1)
+  limitePedidos  Int   @default(10) // por mês
+
+  usuarios    User[]
+  pastas      Pasta[]
+  teses       Tese[]
+  modelosDocumento ModeloDocumento[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("escritorios")
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
   password      String
-  oab           String?   // Número da OAB do advogado
+  oab           String?
+  telefone      String?
+  avatar        String?
+
+  // Papel no escritório
+  role          String    @default("advogado") // admin, advogado, estagiario
+
+  // Preferências
+  tema          String    @default("dark") // dark, light, system
+  notificacoesEmail Boolean @default(true)
+  notificacoesWhatsapp Boolean @default(false)
+  whatsapp      String?
+
+  // Relacionamentos
+  escritorioId  String?
+  escritorio    Escritorio? @relation(fields: [escritorioId], references: [id])
+
+  configuracoes UserConfig?
+  pedidos       Pedido[]
+  comentarios   Comentario[]
+  notificacoes  Notificacao[]
+  prazos        Prazo[]
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  pedidos       Pedido[]
 
   @@map("users")
 }
 
+model UserConfig {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Configurações de formatação padrão
+  fontFamily      String  @default("Times New Roman")
+  fontSize        Int     @default(12)
+  lineHeight      Float   @default(1.5)
+  marginTop       Float   @default(3.0)  // cm
+  marginBottom    Float   @default(2.0)
+  marginLeft      Float   @default(3.0)
+  marginRight     Float   @default(2.0)
+  textAlign       String  @default("justify") // left, center, right, justify
+  paragraphIndent Float   @default(1.25) // cm
+
+  // Cabeçalho
+  cabecalhoAtivo  Boolean @default(true)
+  cabecalhoTexto  String?
+  cabecalhoLogo   String?
+  cabecalhoAlign  String  @default("center")
+
+  // Rodapé
+  rodapeAtivo     Boolean @default(true)
+  rodapeTexto     String?
+  rodapeIncluirPagina Boolean @default(true)
+  rodapeAlign     String  @default("center")
+
+  // Assinatura
+  assinaturaTexto String?
+  assinaturaOAB   String?
+  assinaturaCidade String?
+
+  // Modelo de documento base (arquivo .docx)
+  modeloBaseUrl   String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("user_configs")
+}
+
+// ==================== MODELOS DE DOCUMENTO ====================
+
+model ModeloDocumento {
+  id            String   @id @default(cuid())
+  nome          String
+  descricao     String?
+  tipoPeca      String   // Tipo de peça que este modelo atende
+  conteudo      String   // Template em Markdown/HTML
+  variaveis     String?  // JSON com variáveis do template
+  ativo         Boolean  @default(true)
+
+  escritorioId  String?
+  escritorio    Escritorio? @relation(fields: [escritorioId], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("modelos_documento")
+}
+
+// ==================== PASTAS E ORGANIZAÇÃO ====================
+
+model Pasta {
+  id            String   @id @default(cuid())
+  nome          String
+  cor           String   @default("#3b82f6") // Cor para identificação
+  icone         String   @default("folder")
+
+  // Hierarquia
+  pastaParentId String?
+  pastaParent   Pasta?   @relation("SubPastas", fields: [pastaParentId], references: [id])
+  subPastas     Pasta[]  @relation("SubPastas")
+
+  escritorioId  String?
+  escritorio    Escritorio? @relation(fields: [escritorioId], references: [id])
+
+  pedidos       Pedido[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("pastas")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  nome      String
+  cor       String   @default("#6b7280")
+
+  pedidos   PedidoTag[]
+
+  createdAt DateTime @default(now())
+
+  @@map("tags")
+}
+
+model PedidoTag {
+  pedidoId  String
+  pedido    Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  tagId     String
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([pedidoId, tagId])
+  @@map("pedido_tags")
+}
+
+// ==================== PEDIDOS ====================
+
 model Pedido {
   id              String    @id @default(cuid())
   titulo          String
-  tipoPeca        String    // Tipo da peça jurídica
-  processoNumero  String?   // Número do processo
-  vara            String?   // Vara/Tribunal
-  parteAutora     String?   // Nome da parte autora
-  parteRe         String?   // Nome da parte ré
-  observacoes     String?   // Observações adicionais (campo de texto)
+  tipoPeca        String
 
-  // Status do pedido
+  // Cliente (quem o advogado defende)
+  nomeCliente     String?
+
+  // Informações do processo (opcionais - podem ser extraídas pela IA)
+  processoNumero  String?
+  vara            String?
+  parteAutora     String?
+  parteRe         String?
+  tribunal        String?
+  comarca         String?
+
+  // Campos adicionais
+  observacoes     String?
+
+  // Status
   status          String    @default("pendente") // pendente, processando, concluido, erro
 
-  // Conteúdo gerado
-  pecaGerada      String?   // Texto da peça gerada pela IA
+  // Conteúdo
+  pecaGerada      String?
+  pecaFormatada   String?   // Versão formatada (HTML/DOCX)
 
   // Confirmação
   confirmado      Boolean   @default(false)
   confirmadoEm    DateTime?
 
+  // Favorito
+  favorito        Boolean   @default(false)
+
+  // Organização
+  pastaId         String?
+  pasta           Pasta?    @relation(fields: [pastaId], references: [id])
+
   // Relacionamentos
   userId          String
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   documentos      Documento[]
   mensagens       Mensagem[]
+  versoes         PecaVersao[]
+  comentarios     Comentario[]
+  tags            PedidoTag[]
+  prazos          Prazo[]
 
-  // Timestamps
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -55,13 +234,15 @@ model Pedido {
 
 model Documento {
   id          String   @id @default(cuid())
-  nome        String   // Nome original do arquivo
-  nomeArquivo String   // Nome do arquivo salvo no servidor
-  tipo        String   // MIME type
-  tamanho     Int      // Tamanho em bytes
-  caminho     String   // Caminho do arquivo
+  nome        String
+  nomeArquivo String
+  tipo        String
+  tamanho     Int
+  caminho     String
 
-  // Relacionamento
+  // Metadados extraídos pela IA
+  metadados   String?  // JSON com dados extraídos (número processo, partes, etc)
+
   pedidoId    String
   pedido      Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
 
@@ -72,14 +253,143 @@ model Documento {
 
 model Mensagem {
   id        String   @id @default(cuid())
-  conteudo  String   // Conteúdo da mensagem
+  conteudo  String
   remetente String   // "usuario" ou "sistema"
 
-  // Relacionamento
   pedidoId  String
   pedido    Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@map("mensagens")
+}
+
+// ==================== HISTÓRICO DE VERSÕES ====================
+
+model PecaVersao {
+  id          String   @id @default(cuid())
+  versao      Int      // Número da versão (1, 2, 3...)
+  conteudo    String   // Conteúdo da peça nesta versão
+  descricao   String?  // Descrição das mudanças
+
+  pedidoId    String
+  pedido      Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@map("peca_versoes")
+}
+
+// ==================== BIBLIOTECA DE TESES ====================
+
+model Tese {
+  id            String   @id @default(cuid())
+  titulo        String
+  conteudo      String   // Texto da tese/argumento
+  areaDireito   String   // civil, trabalhista, penal, tributario, etc
+  palavrasChave String?  // Separadas por vírgula
+  fonte         String?  // Jurisprudência, doutrina, etc
+
+  escritorioId  String?
+  escritorio    Escritorio? @relation(fields: [escritorioId], references: [id])
+
+  favorito      Boolean  @default(false)
+  usosCount     Int      @default(0)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("teses")
+}
+
+// ==================== COMENTÁRIOS ====================
+
+model Comentario {
+  id          String   @id @default(cuid())
+  conteudo    String
+  posicao     Int?     // Posição no texto (caractere inicial)
+  resolvido   Boolean  @default(false)
+
+  pedidoId    String
+  pedido      Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("comentarios")
+}
+
+// ==================== PRAZOS PROCESSUAIS ====================
+
+model Prazo {
+  id          String   @id @default(cuid())
+  titulo      String
+  descricao   String?
+  dataVencimento DateTime
+
+  // Tipo de prazo
+  tipo        String   @default("processual") // processual, interno, audiencia, pericia
+  prioridade  String   @default("media") // baixa, media, alta, urgente
+
+  // Status
+  status      String   @default("pendente") // pendente, concluido, vencido
+  concluidoEm DateTime?
+
+  // Alertas
+  alertaEmail Boolean  @default(true)
+  alertaWhatsapp Boolean @default(false)
+  diasAntecedencia Int  @default(3) // Alertar X dias antes
+  alertaEnviado Boolean @default(false)
+
+  pedidoId    String?
+  pedido      Pedido?  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("prazos")
+}
+
+// ==================== NOTIFICAÇÕES ====================
+
+model Notificacao {
+  id          String   @id @default(cuid())
+  titulo      String
+  mensagem    String
+  tipo        String   // pedido_concluido, prazo_vencendo, sistema, etc
+  lida        Boolean  @default(false)
+
+  // Link relacionado
+  link        String?
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@map("notificacoes")
+}
+
+// ==================== ESTATÍSTICAS ====================
+
+model Estatistica {
+  id              String   @id @default(cuid())
+  data            DateTime @default(now())
+
+  // Métricas diárias
+  pedidosCriados  Int      @default(0)
+  pedidosConcluidos Int    @default(0)
+  documentosUpload Int     @default(0)
+  tempoMedioProcessamento Int @default(0) // em segundos
+
+  userId          String?
+  escritorioId    String?
+
+  @@map("estatisticas")
 }

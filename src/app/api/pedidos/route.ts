@@ -7,16 +7,20 @@ import { authOptions } from '@/lib/auth'
 const createPedidoSchema = z.object({
   titulo: z.string().min(3, 'Título deve ter pelo menos 3 caracteres'),
   tipoPeca: z.string().min(1, 'Selecione o tipo de peça'),
+  nomeCliente: z.string().optional(),
   processoNumero: z.string().optional(),
   vara: z.string().optional(),
+  tribunal: z.string().optional(),
+  comarca: z.string().optional(),
   parteAutora: z.string().optional(),
   parteRe: z.string().optional(),
   observacoes: z.string().optional(),
   documentoIds: z.array(z.string()).optional(),
+  pastaId: z.string().optional(),
 })
 
 // GET - Listar pedidos do usuário
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -24,18 +28,66 @@ export async function GET() {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
-    const pedidos = await prisma.pedido.findMany({
-      where: { userId: session.user.id },
-      include: {
-        documentos: true,
-        _count: {
-          select: { mensagens: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    const { searchParams } = new URL(request.url)
+    const busca = searchParams.get('busca')
+    const status = searchParams.get('status')
+    const pastaId = searchParams.get('pastaId')
+    const favoritos = searchParams.get('favoritos') === 'true'
+    const limite = parseInt(searchParams.get('limite') || '50')
+    const pagina = parseInt(searchParams.get('pagina') || '1')
 
-    return NextResponse.json(pedidos)
+    // Construir filtro
+    const where: any = { userId: session.user.id }
+
+    if (busca) {
+      where.OR = [
+        { titulo: { contains: busca } },
+        { nomeCliente: { contains: busca } },
+        { processoNumero: { contains: busca } },
+        { observacoes: { contains: busca } },
+      ]
+    }
+
+    if (status) {
+      where.status = status
+    }
+
+    if (pastaId) {
+      where.pastaId = pastaId
+    }
+
+    if (favoritos) {
+      where.favorito = true
+    }
+
+    const [pedidos, total] = await Promise.all([
+      prisma.pedido.findMany({
+        where,
+        include: {
+          documentos: true,
+          tags: {
+            include: {
+              tag: true,
+            },
+          },
+          pasta: true,
+          _count: {
+            select: { mensagens: true, versoes: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (pagina - 1) * limite,
+        take: limite,
+      }),
+      prisma.pedido.count({ where }),
+    ])
+
+    return NextResponse.json({
+      pedidos,
+      total,
+      paginas: Math.ceil(total / limite),
+      paginaAtual: pagina,
+    })
   } catch (error) {
     console.error('Erro ao listar pedidos:', error)
     return NextResponse.json(
@@ -61,11 +113,15 @@ export async function POST(request: Request) {
       data: {
         titulo: data.titulo,
         tipoPeca: data.tipoPeca,
+        nomeCliente: data.nomeCliente,
         processoNumero: data.processoNumero,
         vara: data.vara,
+        tribunal: data.tribunal,
+        comarca: data.comarca,
         parteAutora: data.parteAutora,
         parteRe: data.parteRe,
         observacoes: data.observacoes,
+        pastaId: data.pastaId,
         userId: session.user.id,
         status: 'pendente',
       },
