@@ -22,7 +22,6 @@ model User {
 
 model Pedido {
   id              String    @id @default(cuid())
-  numero          Int       @default(autoincrement())
   titulo          String
   tipoPeca        String    // Tipo da peça jurídica
   processoNumero  String?   // Número do processo
