@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String
+  oab           String?   // Número da OAB do advogado
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  pedidos       Pedido[]
+
+  @@map("users")
+}
+
+model Pedido {
+  id              String    @id @default(cuid())
+  numero          Int       @default(autoincrement())
+  titulo          String
+  tipoPeca        String    // Tipo da peça jurídica
+  processoNumero  String?   // Número do processo
+  vara            String?   // Vara/Tribunal
+  parteAutora     String?   // Nome da parte autora
+  parteRe         String?   // Nome da parte ré
+  observacoes     String?   // Observações adicionais (campo de texto)
+
+  // Status do pedido
+  status          String    @default("pendente") // pendente, processando, concluido, erro
+
+  // Conteúdo gerado
+  pecaGerada      String?   // Texto da peça gerada pela IA
+
+  // Confirmação
+  confirmado      Boolean   @default(false)
+  confirmadoEm    DateTime?
+
+  // Relacionamentos
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentos      Documento[]
+  mensagens       Mensagem[]
+
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("pedidos")
+}
+
+model Documento {
+  id          String   @id @default(cuid())
+  nome        String   // Nome original do arquivo
+  nomeArquivo String   // Nome do arquivo salvo no servidor
+  tipo        String   // MIME type
+  tamanho     Int      // Tamanho em bytes
+  caminho     String   // Caminho do arquivo
+
+  // Relacionamento
+  pedidoId    String
+  pedido      Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@map("documentos")
+}
+
+model Mensagem {
+  id        String   @id @default(cuid())
+  conteudo  String   // Conteúdo da mensagem
+  remetente String   // "usuario" ou "sistema"
+
+  // Relacionamento
+  pedidoId  String
+  pedido    Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("mensagens")
+}
