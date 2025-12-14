@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ReactMarkdown from 'react-markdown'
-import { Button, Badge, Card, CardContent } from '@/components/ui'
+import { Button, Badge, Card, CardContent, ProcessingStages } from '@/components/ui'
 import { Header } from '@/components/layout'
 import { ChatMessage, ChatInput } from '@/components/chat'
 import { formatDateTime, formatFileSize } from '@/lib/utils'
@@ -42,12 +42,15 @@ interface Pedido {
   numero: number
   titulo: string
   tipoPeca: string
+  nomeCliente: string | null
   processoNumero: string | null
   vara: string | null
   parteAutora: string | null
   parteRe: string | null
   observacoes: string | null
   status: string
+  etapaAtual: string
+  etapaProgresso: number
   pecaGerada: string | null
   confirmado: boolean
   confirmadoEm: string | null
@@ -91,7 +94,7 @@ export default function PedidoPage() {
       if (pedido?.status === 'processando') {
         fetchPedido()
       }
-    }, 5000)
+    }, 3000) // Atualiza a cada 3 segundos durante processamento
 
     return () => clearInterval(interval)
   }, [params.id, pedido?.status])
@@ -265,6 +268,16 @@ export default function PedidoPage() {
             <p className="text-white">{getTipoPecaLabel(pedido.tipoPeca)}</p>
           </div>
 
+          {/* Cliente */}
+          {pedido.nomeCliente && (
+            <div>
+              <p className="text-xs text-dark-500 uppercase tracking-wider mb-2">
+                Cliente
+              </p>
+              <p className="text-white">{pedido.nomeCliente}</p>
+            </div>
+          )}
+
           {/* Informações do Processo */}
           {(pedido.processoNumero || pedido.vara) && (
             <div>
@@ -386,37 +399,36 @@ export default function PedidoPage() {
 
         {/* Main content */}
         <div className="flex-1 flex flex-col min-h-0">
-          {/* Status messages */}
+          {/* Status pendente - aguardando */}
           {pedido.status === 'pendente' && (
-            <div className="p-4 bg-yellow-900/20 border-b border-yellow-800/50">
-              <div className="flex items-center gap-3">
-                <Clock className="w-5 h-5 text-yellow-400" />
-                <p className="text-yellow-200">
-                  Pedido aguardando processamento...
-                </p>
-              </div>
+            <div className="flex-1 flex items-center justify-center p-6">
+              <ProcessingStages
+                currentStage="aguardando"
+                progress={0}
+                className="max-w-md w-full"
+              />
             </div>
           )}
 
+          {/* Status processando - mostrar etapas */}
           {pedido.status === 'processando' && (
-            <div className="p-4 bg-blue-900/20 border-b border-blue-800/50">
-              <div className="flex items-center gap-3">
-                <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-                <p className="text-blue-200">
-                  Processando pedido... Isso pode levar alguns minutos.
-                </p>
-              </div>
+            <div className="flex-1 flex items-center justify-center p-6">
+              <ProcessingStages
+                currentStage={pedido.etapaAtual || 'lendo'}
+                progress={pedido.etapaProgresso || 0}
+                className="max-w-md w-full"
+              />
             </div>
           )}
 
+          {/* Status erro */}
           {pedido.status === 'erro' && (
-            <div className="p-4 bg-red-900/20 border-b border-red-800/50">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400" />
-                <p className="text-red-200">
-                  Ocorreu um erro ao processar o pedido. Tente novamente.
-                </p>
-              </div>
+            <div className="flex-1 flex items-center justify-center p-6">
+              <ProcessingStages
+                currentStage="erro"
+                progress={0}
+                className="max-w-md w-full"
+              />
             </div>
           )}
 
@@ -489,7 +501,7 @@ export default function PedidoPage() {
           )}
 
           {/* Observações quando não há peça gerada */}
-          {!pedido.pecaGerada && pedido.observacoes && (
+          {!pedido.pecaGerada && pedido.observacoes && pedido.status !== 'processando' && pedido.status !== 'pendente' && (
             <div className="p-6">
               <Card variant="bordered">
                 <CardContent>

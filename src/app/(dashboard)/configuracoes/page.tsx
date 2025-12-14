@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -19,12 +19,16 @@ import {
   Sun,
   Bell,
   Shield,
+  Upload,
+  File,
+  Trash2,
+  Download,
+  FileCheck,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   Button,
   Input,
-  Select,
   Card,
   CardHeader,
   CardTitle,
@@ -65,6 +69,9 @@ export default function ConfiguracoesPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState('documento')
+  const [modeloBase, setModeloBase] = useState<{ nome: string; url: string } | null>(null)
+  const [uploadingModelo, setUploadingModelo] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
     register,
@@ -103,6 +110,9 @@ export default function ConfiguracoesPage() {
       if (response.ok) {
         const data = await response.json()
         reset(data)
+        if (data.modeloBaseUrl && data.modeloBaseNome) {
+          setModeloBase({ nome: data.modeloBaseNome, url: data.modeloBaseUrl })
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar configurações:', error)
@@ -132,6 +142,79 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  const handleModeloUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validar tipo de arquivo
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+      'application/msword', // .doc
+    ]
+
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Apenas arquivos .doc e .docx são permitidos')
+      return
+    }
+
+    setUploadingModelo(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('tipo', 'modelo')
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro no upload')
+      }
+
+      const data = await response.json()
+
+      // Salvar referência do modelo nas configurações
+      await fetch('/api/configuracoes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modeloBaseUrl: data.caminho,
+          modeloBaseNome: file.name,
+        }),
+      })
+
+      setModeloBase({ nome: file.name, url: data.caminho })
+      toast.success('Modelo base enviado com sucesso!')
+    } catch (error) {
+      toast.error('Erro ao enviar modelo')
+    } finally {
+      setUploadingModelo(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleRemoveModelo = async () => {
+    try {
+      await fetch('/api/configuracoes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modeloBaseUrl: null,
+          modeloBaseNome: null,
+        }),
+      })
+
+      setModeloBase(null)
+      toast.success('Modelo removido')
+    } catch (error) {
+      toast.error('Erro ao remover modelo')
+    }
+  }
+
   const resetToDefaults = () => {
     reset({
       fonte: 'Times New Roman',
@@ -151,6 +234,7 @@ export default function ConfiguracoesPage() {
 
   const tabs = [
     { id: 'documento', label: 'Documento', icon: FileText },
+    { id: 'modelo', label: 'Modelo Base', icon: FileCheck },
     { id: 'aparencia', label: 'Aparência', icon: Sun },
     { id: 'notificacoes', label: 'Notificações', icon: Bell },
     { id: 'privacidade', label: 'Privacidade', icon: Shield },
@@ -391,6 +475,120 @@ export default function ConfiguracoesPage() {
                 </Button>
               </div>
             </form>
+          )}
+
+          {activeTab === 'modelo' && (
+            <Card variant="bordered">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileCheck className="w-5 h-5 text-primary-400" />
+                  Modelo Base de Documento
+                </CardTitle>
+                <CardDescription>
+                  Envie um documento Word (.docx) que servirá como modelo padrão para todas as peças geradas.
+                  A IA utilizará esse modelo para manter o padrão de formatação e estilo do seu escritório.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Upload Area */}
+                <div
+                  className={cn(
+                    'border-2 border-dashed rounded-xl p-8 text-center transition-all',
+                    modeloBase
+                      ? 'border-green-500/50 bg-green-500/5'
+                      : 'border-dark-600 hover:border-primary-500 hover:bg-dark-800/50'
+                  )}
+                >
+                  {modeloBase ? (
+                    <div className="space-y-4">
+                      <div className="w-16 h-16 mx-auto rounded-xl bg-green-500/20 flex items-center justify-center">
+                        <FileCheck className="w-8 h-8 text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{modeloBase.nome}</p>
+                        <p className="text-sm text-dark-400 mt-1">
+                          Modelo base configurado com sucesso
+                        </p>
+                      </div>
+                      <div className="flex gap-3 justify-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="gap-2"
+                        >
+                          <Upload className="w-4 h-4" />
+                          Substituir
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleRemoveModelo}
+                          className="gap-2 text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Remover
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="w-16 h-16 mx-auto rounded-xl bg-dark-700 flex items-center justify-center">
+                        <Upload className="w-8 h-8 text-dark-400" />
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">
+                          Arraste um arquivo ou clique para selecionar
+                        </p>
+                        <p className="text-sm text-dark-400 mt-1">
+                          Formatos aceitos: .doc, .docx
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        loading={uploadingModelo}
+                        className="gap-2"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Selecionar Arquivo
+                      </Button>
+                    </div>
+                  )}
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".doc,.docx"
+                    onChange={handleModeloUpload}
+                    className="hidden"
+                  />
+                </div>
+
+                {/* Dicas */}
+                <div className="p-4 rounded-lg bg-dark-800 space-y-3">
+                  <h4 className="font-medium text-white">Dicas para o modelo base:</h4>
+                  <ul className="space-y-2 text-sm text-dark-400">
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary-400">•</span>
+                      Use um documento que represente o padrão do seu escritório
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary-400">•</span>
+                      Inclua cabeçalho e rodapé formatados como deseja
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary-400">•</span>
+                      Configure margens, fontes e espaçamento conforme seu padrão
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-primary-400">•</span>
+                      O conteúdo do documento será substituído pela peça gerada
+                    </li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {activeTab === 'aparencia' && (

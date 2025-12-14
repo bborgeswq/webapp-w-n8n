@@ -12,12 +12,14 @@ const updateConfigSchema = z.object({
   margemInferior: z.number().min(0).max(10).optional(),
   margemEsquerda: z.number().min(0).max(10).optional(),
   margemDireita: z.number().min(0).max(10).optional(),
-  cabecalho: z.string().optional(),
-  rodape: z.string().optional(),
+  cabecalho: z.string().optional().nullable(),
+  rodape: z.string().optional().nullable(),
   alinhamentoTexto: z.enum(['left', 'center', 'right', 'justify']).optional(),
   numeracaoPaginas: z.boolean().optional(),
-  assinaturaDigital: z.string().optional(),
-  logoUrl: z.string().optional(),
+  assinaturaDigital: z.string().optional().nullable(),
+  logoUrl: z.string().optional().nullable(),
+  modeloBaseUrl: z.string().optional().nullable(),
+  modeloBaseNome: z.string().optional().nullable(),
 })
 
 // GET - Obter configurações do usuário

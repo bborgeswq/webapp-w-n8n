@@ -16,12 +16,11 @@ model Escritorio {
   endereco    String?
   telefone    String?
   email       String?
-  logo        String?  // URL do logo
+  logo        String?
 
-  // Plano/Assinatura
-  plano       String   @default("free") // free, pro, enterprise
+  plano       String   @default("free")
   limiteUsuarios Int   @default(1)
-  limitePedidos  Int   @default(10) // por mês
+  limitePedidos  Int   @default(10)
 
   usuarios    User[]
   pastas      Pasta[]
@@ -43,16 +42,13 @@ model User {
   telefone      String?
   avatar        String?
 
-  // Papel no escritório
-  role          String    @default("advogado") // admin, advogado, estagiario
+  role          String    @default("advogado")
 
-  // Preferências
-  tema          String    @default("dark") // dark, light, system
+  tema          String    @default("dark")
   notificacoesEmail Boolean @default(true)
   notificacoesWhatsapp Boolean @default(false)
   whatsapp      String?
 
-  // Relacionamentos
   escritorioId  String?
   escritorio    Escritorio? @relation(fields: [escritorioId], references: [id])
 
@@ -61,6 +57,7 @@ model User {
   comentarios   Comentario[]
   notificacoes  Notificacao[]
   prazos        Prazo[]
+  teses         Tese[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -73,36 +70,28 @@ model UserConfig {
   userId          String  @unique
   user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Configurações de formatação padrão
-  fontFamily      String  @default("Times New Roman")
-  fontSize        Int     @default(12)
-  lineHeight      Float   @default(1.5)
-  marginTop       Float   @default(3.0)  // cm
-  marginBottom    Float   @default(2.0)
-  marginLeft      Float   @default(3.0)
-  marginRight     Float   @default(2.0)
-  textAlign       String  @default("justify") // left, center, right, justify
-  paragraphIndent Float   @default(1.25) // cm
+  // Configurações de formatação (nomes compatíveis com API)
+  fonte           String  @default("Times New Roman")
+  tamanhoFonte    Int     @default(12)
+  espacamentoLinha Float  @default(1.5)
+  margemSuperior  Float   @default(3.0)
+  margemInferior  Float   @default(2.0)
+  margemEsquerda  Float   @default(3.0)
+  margemDireita   Float   @default(2.0)
+  alinhamentoTexto String @default("justify")
 
-  // Cabeçalho
-  cabecalhoAtivo  Boolean @default(true)
-  cabecalhoTexto  String?
-  cabecalhoLogo   String?
-  cabecalhoAlign  String  @default("center")
-
-  // Rodapé
-  rodapeAtivo     Boolean @default(true)
-  rodapeTexto     String?
-  rodapeIncluirPagina Boolean @default(true)
-  rodapeAlign     String  @default("center")
+  // Cabeçalho e Rodapé
+  cabecalho       String?
+  rodape          String?
+  numeracaoPaginas Boolean @default(true)
 
   // Assinatura
-  assinaturaTexto String?
-  assinaturaOAB   String?
-  assinaturaCidade String?
+  assinaturaDigital String?
+  logoUrl         String?
 
   // Modelo de documento base (arquivo .docx)
   modeloBaseUrl   String?
+  modeloBaseNome  String?
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -116,9 +105,10 @@ model ModeloDocumento {
   id            String   @id @default(cuid())
   nome          String
   descricao     String?
-  tipoPeca      String   // Tipo de peça que este modelo atende
-  conteudo      String   // Template em Markdown/HTML
-  variaveis     String?  // JSON com variáveis do template
+  tipoPeca      String
+  conteudo      String
+  arquivoUrl    String?  // URL do arquivo .docx modelo
+  variaveis     String?
   ativo         Boolean  @default(true)
 
   escritorioId  String?
@@ -135,10 +125,9 @@ model ModeloDocumento {
 model Pasta {
   id            String   @id @default(cuid())
   nome          String
-  cor           String   @default("#3b82f6") // Cor para identificação
+  cor           String   @default("#3b82f6")
   icone         String   @default("folder")
 
-  // Hierarquia
   pastaParentId String?
   pastaParent   Pasta?   @relation("SubPastas", fields: [pastaParentId], references: [id])
   subPastas     Pasta[]  @relation("SubPastas")
@@ -183,10 +172,8 @@ model Pedido {
   titulo          String
   tipoPeca        String
 
-  // Cliente (quem o advogado defende)
   nomeCliente     String?
 
-  // Informações do processo (opcionais - podem ser extraídas pela IA)
   processoNumero  String?
   vara            String?
   parteAutora     String?
@@ -194,28 +181,26 @@ model Pedido {
   tribunal        String?
   comarca         String?
 
-  // Campos adicionais
   observacoes     String?
 
-  // Status
-  status          String    @default("pendente") // pendente, processando, concluido, erro
+  // Status principal
+  status          String    @default("pendente")
 
-  // Conteúdo
+  // Etapa atual do processamento (para exibição visual)
+  etapaAtual      String    @default("aguardando") // aguardando, lendo, escrevendo, validando, formatando, concluido
+  etapaProgresso  Int       @default(0) // 0-100
+
   pecaGerada      String?
-  pecaFormatada   String?   // Versão formatada (HTML/DOCX)
+  pecaFormatada   String?
 
-  // Confirmação
   confirmado      Boolean   @default(false)
   confirmadoEm    DateTime?
 
-  // Favorito
   favorito        Boolean   @default(false)
 
-  // Organização
   pastaId         String?
   pasta           Pasta?    @relation(fields: [pastaId], references: [id])
 
-  // Relacionamentos
   userId          String
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -225,6 +210,7 @@ model Pedido {
   comentarios     Comentario[]
   tags            PedidoTag[]
   prazos          Prazo[]
+  notificacoes    Notificacao[]
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -240,8 +226,7 @@ model Documento {
   tamanho     Int
   caminho     String
 
-  // Metadados extraídos pela IA
-  metadados   String?  // JSON com dados extraídos (número processo, partes, etc)
+  metadados   String?
 
   pedidoId    String
   pedido      Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
@@ -254,7 +239,7 @@ model Documento {
 model Mensagem {
   id        String   @id @default(cuid())
   conteudo  String
-  remetente String   // "usuario" ou "sistema"
+  remetente String
 
   pedidoId  String
   pedido    Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
@@ -268,9 +253,9 @@ model Mensagem {
 
 model PecaVersao {
   id          String   @id @default(cuid())
-  versao      Int      // Número da versão (1, 2, 3...)
-  conteudo    String   // Conteúdo da peça nesta versão
-  descricao   String?  // Descrição das mudanças
+  versao      Int
+  conteudo    String
+  descricao   String?
 
   pedidoId    String
   pedido      Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
@@ -285,10 +270,14 @@ model PecaVersao {
 model Tese {
   id            String   @id @default(cuid())
   titulo        String
-  conteudo      String   // Texto da tese/argumento
-  areaDireito   String   // civil, trabalhista, penal, tributario, etc
-  palavrasChave String?  // Separadas por vírgula
-  fonte         String?  // Jurisprudência, doutrina, etc
+  descricao     String?
+  conteudo      String
+  areaDireito   String
+  tags          String?  // Separadas por vírgula
+  fontes        String?
+
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   escritorioId  String?
   escritorio    Escritorio? @relation(fields: [escritorioId], references: [id])
@@ -307,7 +296,7 @@ model Tese {
 model Comentario {
   id          String   @id @default(cuid())
   conteudo    String
-  posicao     Int?     // Posição no texto (caractere inicial)
+  posicao     Int?
   resolvido   Boolean  @default(false)
 
   pedidoId    String
@@ -325,33 +314,30 @@ model Comentario {
 // ==================== PRAZOS PROCESSUAIS ====================
 
 model Prazo {
-  id          String   @id @default(cuid())
-  titulo      String
-  descricao   String?
-  dataVencimento DateTime
+  id              String   @id @default(cuid())
+  titulo          String
+  descricao       String?
+  dataVencimento  DateTime
 
-  // Tipo de prazo
-  tipo        String   @default("processual") // processual, interno, audiencia, pericia
-  prioridade  String   @default("media") // baixa, media, alta, urgente
+  tipo            String   @default("judicial")
+  prioridade      String   @default("media")
+  status          String   @default("pendente")
 
-  // Status
-  status      String   @default("pendente") // pendente, concluido, vencido
-  concluidoEm DateTime?
+  processoNumero  String?
+  nomeCliente     String?
 
-  // Alertas
-  alertaEmail Boolean  @default(true)
-  alertaWhatsapp Boolean @default(false)
-  diasAntecedencia Int  @default(3) // Alertar X dias antes
-  alertaEnviado Boolean @default(false)
+  lembrete        Boolean  @default(true)
+  diasLembrete    Int      @default(3)
+  lembreteEnviado Boolean  @default(false)
 
-  pedidoId    String?
-  pedido      Pedido?  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  pedidoId        String?
+  pedido          Pedido?  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@map("prazos")
 }
@@ -362,11 +348,14 @@ model Notificacao {
   id          String   @id @default(cuid())
   titulo      String
   mensagem    String
-  tipo        String   // pedido_concluido, prazo_vencendo, sistema, etc
+  tipo        String
   lida        Boolean  @default(false)
-
-  // Link relacionado
   link        String?
+
+  pedidoId    String?
+  pedido      Pedido?  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  prazoId     String?
 
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -382,11 +371,10 @@ model Estatistica {
   id              String   @id @default(cuid())
   data            DateTime @default(now())
 
-  // Métricas diárias
   pedidosCriados  Int      @default(0)
   pedidosConcluidos Int    @default(0)
   documentosUpload Int     @default(0)
-  tempoMedioProcessamento Int @default(0) // em segundos
+  tempoMedioProcessamento Int @default(0)
 
   userId          String?
   escritorioId    String?
