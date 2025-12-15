@@ -55,7 +55,7 @@ export async function POST(
     })
 
     // Preparar dados dos documentos (ler conteúdo dos arquivos se necessário)
-    const documentosData = pedido.documentos.map((doc) => ({
+    const documentosData = pedido.documentos.map((doc: { id: string; nome: string; tipo: string; tamanho: number; caminho: string }) => ({
       id: doc.id,
       nome: doc.nome,
       tipo: doc.tipo,

@@ -132,7 +132,7 @@ export async function GET() {
         totalDocumentos,
         tendencia,
       },
-      pedidosPorTipo: pedidosPorTipo.map(p => ({
+      pedidosPorTipo: pedidosPorTipo.map((p: { tipoPeca: string; _count: { tipoPeca: number } }) => ({
         tipo: p.tipoPeca,
         quantidade: p._count.tipoPeca,
       })),
