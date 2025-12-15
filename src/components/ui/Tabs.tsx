@@ -1,27 +1,34 @@
 'use client'
 
-import { ReactNode, useState } from 'react'
+import { ReactNode, useState, ComponentType } from 'react'
 import { cn } from '@/lib/utils'
+import { LucideIcon } from 'lucide-react'
 
 interface Tab {
   id: string
   label: string
-  icon?: ReactNode
-  content: ReactNode
+  icon?: LucideIcon | ComponentType<{ className?: string }>
+  content?: ReactNode
 }
 
 interface TabsProps {
   tabs: Tab[]
   defaultTab?: string
+  activeTab?: string
   onChange?: (tabId: string) => void
   variant?: 'default' | 'pills' | 'underline'
 }
 
-export function Tabs({ tabs, defaultTab, onChange, variant = 'default' }: TabsProps) {
-  const [activeTab, setActiveTab] = useState(defaultTab || tabs[0]?.id)
+export function Tabs({ tabs, defaultTab, activeTab: controlledActiveTab, onChange, variant = 'default' }: TabsProps) {
+  const [internalActiveTab, setInternalActiveTab] = useState(defaultTab || tabs[0]?.id)
+
+  // Use controlled value if provided, otherwise use internal state
+  const activeTab = controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab
 
   const handleTabClick = (tabId: string) => {
-    setActiveTab(tabId)
+    if (controlledActiveTab === undefined) {
+      setInternalActiveTab(tabId)
+    }
     onChange?.(tabId)
   }
 
@@ -51,27 +58,32 @@ export function Tabs({ tabs, defaultTab, onChange, variant = 'default' }: TabsPr
   return (
     <div>
       {/* Tab List */}
-      <div className={cn('flex gap-1', currentVariant.list)}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabClick(tab.id)}
-            className={cn(
-              'px-4 py-2.5 text-sm font-medium transition-colors flex items-center gap-2',
-              currentVariant.tab,
-              activeTab === tab.id ? currentVariant.activeTab : currentVariant.inactiveTab
-            )}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
+      <div className={cn('flex gap-1 overflow-x-auto', currentVariant.list)}>
+        {tabs.map((tab) => {
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabClick(tab.id)}
+              className={cn(
+                'px-4 py-2.5 text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap',
+                currentVariant.tab,
+                activeTab === tab.id ? currentVariant.activeTab : currentVariant.inactiveTab
+              )}
+            >
+              {Icon && <Icon className="w-4 h-4" />}
+              {tab.label}
+            </button>
+          )
+        })}
       </div>
 
-      {/* Tab Content */}
-      <div className="mt-4">
-        {tabs.find((tab) => tab.id === activeTab)?.content}
-      </div>
+      {/* Tab Content - only render if tabs have content */}
+      {tabs.some(tab => tab.content) && (
+        <div className="mt-4">
+          {tabs.find((tab) => tab.id === activeTab)?.content}
+        </div>
+      )}
     </div>
   )
 }
