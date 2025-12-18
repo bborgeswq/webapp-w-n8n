@@ -73,15 +73,19 @@ export async function POST(request: Request) {
     ]
 
     const fileExtension = path.extname(file.name).toLowerCase()
-    const isAllowedType = allowedTypes.includes(file.type)
+    const isAllowedType = file.type && allowedTypes.includes(file.type)
     const isAllowedExtension = allowedExtensions.includes(fileExtension)
 
+    // Permitir se o tipo OU a extensão forem válidos (mais permissivo)
     if (!isAllowedType && !isAllowedExtension) {
+      console.log('Arquivo rejeitado:', { name: file.name, type: file.type, extension: fileExtension })
       return NextResponse.json(
-        { error: 'Tipo de arquivo não permitido. Use PDF, DOC, DOCX, imagens ou ZIP.' },
+        { error: `Tipo de arquivo não permitido (${file.type || 'desconhecido'}). Use PDF, DOC, DOCX, imagens ou ZIP.` },
         { status: 400 }
       )
     }
+
+    console.log('Arquivo aceito:', { name: file.name, type: file.type, extension: fileExtension, size: file.size })
 
     // Criar diretório de uploads se não existir
     const uploadDir = path.join(process.cwd(), 'public', 'uploads')
@@ -111,8 +115,20 @@ export async function POST(request: Request) {
     return NextResponse.json(documento, { status: 201 })
   } catch (error) {
     console.error('Erro ao fazer upload:', error)
+
+    // Retornar mensagem de erro mais específica
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+
+    // Verificar se é erro do Prisma
+    if (errorMessage.includes('prisma') || errorMessage.includes('database')) {
+      return NextResponse.json(
+        { error: 'Erro ao salvar no banco de dados. Verifique a conexão.' },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { error: `Erro interno do servidor: ${errorMessage}` },
       { status: 500 }
     )
   }

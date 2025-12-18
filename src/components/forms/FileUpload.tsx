@@ -1,8 +1,8 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { useDropzone } from 'react-dropzone'
-import { Upload, X, FileText, Image, File } from 'lucide-react'
+import { useDropzone, FileRejection } from 'react-dropzone'
+import { Upload, X, FileText, Image, File, AlertCircle } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
 import { Button } from '@/components/ui'
 
@@ -33,25 +33,38 @@ export function FileUpload({ onFilesChange, maxFiles = 10, pedidoId }: FileUploa
     }
 
     try {
+      console.log('Iniciando upload:', file.name, file.type, file.size)
+
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
+        console.error('Erro na resposta do servidor:', data)
         throw new Error(data.error || 'Erro ao fazer upload')
       }
 
-      return await response.json()
+      console.log('Upload concluído com sucesso:', data)
+      return data
     } catch (err) {
       console.error('Erro no upload:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido'
+      setError(`Erro ao enviar ${file.name}: ${errorMessage}`)
       return null
     }
   }
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
+      console.log('Arquivos aceitos:', acceptedFiles.length)
+
+      if (acceptedFiles.length === 0) {
+        return
+      }
+
       if (files.length + acceptedFiles.length > maxFiles) {
         setError(`Máximo de ${maxFiles} arquivos permitidos`)
         return
@@ -61,12 +74,19 @@ export function FileUpload({ onFilesChange, maxFiles = 10, pedidoId }: FileUploa
       setError(null)
 
       const uploadedFiles: UploadedFile[] = []
+      const errors: string[] = []
 
       for (const file of acceptedFiles) {
         const result = await uploadFile(file)
         if (result) {
           uploadedFiles.push(result)
+        } else {
+          errors.push(file.name)
         }
+      }
+
+      if (errors.length > 0 && uploadedFiles.length === 0) {
+        setError(`Falha ao enviar: ${errors.join(', ')}`)
       }
 
       const newFiles = [...files, ...uploadedFiles]
@@ -77,6 +97,27 @@ export function FileUpload({ onFilesChange, maxFiles = 10, pedidoId }: FileUploa
     [files, maxFiles, onFilesChange, pedidoId]
   )
 
+  const onDropRejected = useCallback((rejectedFiles: FileRejection[]) => {
+    console.log('Arquivos rejeitados:', rejectedFiles)
+
+    const errorMessages = rejectedFiles.map((rejection) => {
+      const fileName = rejection.file.name
+      const errors = rejection.errors.map((e) => {
+        switch (e.code) {
+          case 'file-too-large':
+            return `muito grande (máx. 150MB)`
+          case 'file-invalid-type':
+            return `tipo não permitido`
+          default:
+            return e.message
+        }
+      })
+      return `${fileName}: ${errors.join(', ')}`
+    })
+
+    setError(errorMessages.join('; '))
+  }, [])
+
   const removeFile = (fileId: string) => {
     const newFiles = files.filter((f) => f.id !== fileId)
     setFiles(newFiles)
@@ -85,6 +126,7 @@ export function FileUpload({ onFilesChange, maxFiles = 10, pedidoId }: FileUploa
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected,
     accept: {
       'application/pdf': ['.pdf'],
       'application/msword': ['.doc'],
@@ -100,6 +142,7 @@ export function FileUpload({ onFilesChange, maxFiles = 10, pedidoId }: FileUploa
     },
     maxSize: 150 * 1024 * 1024, // 150MB
     disabled: uploading,
+    multiple: true,
   })
 
   const getFileIcon = (tipo: string) => {
@@ -119,7 +162,8 @@ export function FileUpload({ onFilesChange, maxFiles = 10, pedidoId }: FileUploa
           isDragActive
             ? 'border-primary-500 bg-primary-500/10'
             : 'border-dark-600 hover:border-dark-500',
-          uploading && 'opacity-50 cursor-not-allowed'
+          uploading && 'opacity-50 cursor-not-allowed',
+          error && 'border-red-500/50'
         )}
       >
         <input {...getInputProps()} />
@@ -137,11 +181,16 @@ export function FileUpload({ onFilesChange, maxFiles = 10, pedidoId }: FileUploa
           </>
         )}
         {uploading && (
-          <p className="text-primary-400 mt-2">Enviando arquivos...</p>
+          <p className="text-primary-400 mt-2 animate-pulse">Enviando arquivos...</p>
         )}
       </div>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && (
+        <div className="flex items-start gap-2 p-3 bg-red-900/20 border border-red-800 rounded-lg">
+          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-400">{error}</p>
+        </div>
+      )}
 
       {files.length > 0 && (
         <div className="space-y-2">
@@ -168,7 +217,10 @@ export function FileUpload({ onFilesChange, maxFiles = 10, pedidoId }: FileUploa
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => removeFile(file.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeFile(file.id)
+                  }}
                   className="text-dark-400 hover:text-red-400"
                 >
                   <X className="w-4 h-4" />
