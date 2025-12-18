@@ -33,24 +33,38 @@ export function FileUpload({ onFilesChange, maxFiles = 10, pedidoId }: FileUploa
     }
 
     try {
-      console.log('Iniciando upload:', file.name, file.type, file.size)
+      console.log('=== INICIANDO UPLOAD ===')
+      console.log('Nome:', file.name)
+      console.log('Tipo MIME:', file.type || '(vazio)')
+      console.log('Tamanho:', file.size, 'bytes')
+      console.log('Extensão:', file.name.split('.').pop()?.toLowerCase())
 
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       })
 
-      const data = await response.json()
+      console.log('Status da resposta:', response.status)
+
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        console.error('Erro ao parsear JSON:', jsonError)
+        throw new Error('Resposta inválida do servidor')
+      }
 
       if (!response.ok) {
         console.error('Erro na resposta do servidor:', data)
-        throw new Error(data.error || 'Erro ao fazer upload')
+        throw new Error(data.error || `Erro HTTP ${response.status}`)
       }
 
-      console.log('Upload concluído com sucesso:', data)
+      console.log('=== UPLOAD CONCLUÍDO ===')
+      console.log('Documento ID:', data.id)
       return data
     } catch (err) {
-      console.error('Erro no upload:', err)
+      console.error('=== ERRO NO UPLOAD ===')
+      console.error('Detalhes:', err)
       const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido'
       setError(`Erro ao enviar ${file.name}: ${errorMessage}`)
       return null

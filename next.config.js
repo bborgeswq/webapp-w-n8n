@@ -8,12 +8,27 @@ const nextConfig = {
   images: {
     remotePatterns: [],
   },
-  // Aumentar timeout para uploads grandes
-  api: {
-    bodyParser: {
-      sizeLimit: '150mb',
-    },
-    responseLimit: '150mb',
+  // Headers de segurança
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'origin-when-cross-origin',
+          },
+        ],
+      },
+    ]
   },
 }
 

@@ -11,18 +11,37 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
+  console.log('=== API UPLOAD: Requisição recebida ===')
+
   try {
     const session = await getServerSession(authOptions)
+    console.log('Sessão:', session?.user?.id ? 'Autenticado' : 'Não autenticado')
 
     if (!session?.user?.id) {
+      console.log('Erro: Usuário não autenticado')
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
-    const formData = await request.formData()
+    let formData
+    try {
+      formData = await request.formData()
+      console.log('FormData recebido com sucesso')
+    } catch (formError) {
+      console.error('Erro ao processar FormData:', formError)
+      return NextResponse.json(
+        { error: 'Erro ao processar dados do formulário' },
+        { status: 400 }
+      )
+    }
+
     const file = formData.get('file') as File | null
     const pedidoId = formData.get('pedidoId') as string | null
 
+    console.log('Arquivo recebido:', file ? `${file.name} (${file.size} bytes)` : 'null')
+    console.log('PedidoId:', pedidoId || 'null')
+
     if (!file) {
+      console.log('Erro: Nenhum arquivo enviado')
       return NextResponse.json(
         { error: 'Nenhum arquivo enviado' },
         { status: 400 }
@@ -89,30 +108,59 @@ export async function POST(request: Request) {
 
     // Criar diretório de uploads se não existir
     const uploadDir = path.join(process.cwd(), 'public', 'uploads')
-    await mkdir(uploadDir, { recursive: true })
+    console.log('Diretório de uploads:', uploadDir)
+
+    try {
+      await mkdir(uploadDir, { recursive: true })
+      console.log('Diretório criado/verificado com sucesso')
+    } catch (mkdirError) {
+      console.error('Erro ao criar diretório:', mkdirError)
+      return NextResponse.json(
+        { error: 'Erro ao criar diretório de uploads' },
+        { status: 500 }
+      )
+    }
 
     // Gerar nome único para o arquivo
     const uniqueFileName = `${uuidv4()}${fileExtension}`
     const filePath = path.join(uploadDir, uniqueFileName)
+    console.log('Caminho do arquivo:', filePath)
 
     // Salvar arquivo
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
+    try {
+      const bytes = await file.arrayBuffer()
+      const buffer = Buffer.from(bytes)
+      await writeFile(filePath, buffer)
+      console.log('Arquivo salvo com sucesso no disco')
+    } catch (writeError) {
+      console.error('Erro ao salvar arquivo:', writeError)
+      return NextResponse.json(
+        { error: 'Erro ao salvar arquivo no servidor' },
+        { status: 500 }
+      )
+    }
 
     // Criar registro no banco (pedidoId é opcional - será vinculado depois)
-    const documento = await prisma.documento.create({
-      data: {
-        nome: file.name,
-        nomeArquivo: uniqueFileName,
-        tipo: file.type || 'application/octet-stream',
-        tamanho: file.size,
-        caminho: `/uploads/${uniqueFileName}`,
-        pedidoId: pedidoId || null,
-      },
-    })
-
-    return NextResponse.json(documento, { status: 201 })
+    try {
+      const documento = await prisma.documento.create({
+        data: {
+          nome: file.name,
+          nomeArquivo: uniqueFileName,
+          tipo: file.type || 'application/octet-stream',
+          tamanho: file.size,
+          caminho: `/uploads/${uniqueFileName}`,
+          pedidoId: pedidoId || null,
+        },
+      })
+      console.log('Documento criado no banco:', documento.id)
+      return NextResponse.json(documento, { status: 201 })
+    } catch (dbError) {
+      console.error('Erro ao salvar no banco:', dbError)
+      return NextResponse.json(
+        { error: 'Erro ao salvar documento no banco de dados' },
+        { status: 500 }
+      )
+    }
   } catch (error) {
     console.error('Erro ao fazer upload:', error)
 
