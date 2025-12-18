@@ -89,10 +89,16 @@ export function FileUpload({ onFilesChange, maxFiles = 10, pedidoId }: FileUploa
       'application/pdf': ['.pdf'],
       'application/msword': ['.doc'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/vnd.oasis.opendocument.text': ['.odt'],
+      'application/rtf': ['.rtf'],
       'text/plain': ['.txt'],
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
+      'application/vnd.ms-excel': ['.xls'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.tiff'],
+      'application/zip': ['.zip'],
+      'application/x-rar-compressed': ['.rar'],
     },
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: 150 * 1024 * 1024, // 150MB
     disabled: uploading,
   })
 
@@ -126,7 +132,7 @@ export function FileUpload({ onFilesChange, maxFiles = 10, pedidoId }: FileUploa
               Arraste e solte arquivos aqui, ou clique para selecionar
             </p>
             <p className="text-sm text-dark-500">
-              PDF, DOC, DOCX, TXT, imagens (máx. 10MB cada)
+              PDF, DOC, DOCX, ODT, RTF, TXT, XLS, XLSX, imagens, ZIP, RAR (máx. 150MB cada)
             </p>
           </>
         )}

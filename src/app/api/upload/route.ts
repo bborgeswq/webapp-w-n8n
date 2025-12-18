@@ -6,12 +6,9 @@ import { v4 as uuidv4 } from 'uuid'
 import prisma from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 
-// Configuração para permitir uploads grandes
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
+// Configuração para App Router - permitir uploads grandes (150MB)
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   try {
@@ -99,7 +96,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(bytes)
     await writeFile(filePath, buffer)
 
-    // Criar registro no banco
+    // Criar registro no banco (pedidoId é opcional - será vinculado depois)
     const documento = await prisma.documento.create({
       data: {
         nome: file.name,
@@ -107,7 +104,7 @@ export async function POST(request: Request) {
         tipo: file.type || 'application/octet-stream',
         tamanho: file.size,
         caminho: `/uploads/${uniqueFileName}`,
-        pedidoId: pedidoId || '',
+        pedidoId: pedidoId || null,
       },
     })
 

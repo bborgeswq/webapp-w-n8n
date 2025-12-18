@@ -228,8 +228,8 @@ model Documento {
 
   metadados   String?
 
-  pedidoId    String
-  pedido      Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  pedidoId    String?
+  pedido      Pedido?  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime @default(now())
 
